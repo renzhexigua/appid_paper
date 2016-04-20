@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=665">
+
+  <link rel="icon" type="image/png" href="/zarowka.png" />
+  <link rel="apple-touch-icon" href="/zarowka.png" />
+
+
+  <link rel="alternate" href="/rss.xml" type="application/rss+xml" title="RSS Feed" />
+
+  <meta name="author" content="Marek" />
+  <title>
+      Dissecting SSL handshake &#8212;
+    Idea of the day
+  </title>
+
+  <style>
+/* http://meyerweb.com/eric/tools/css/reset/ 
+   v2.0 | 20110126
+   License: none (public domain)
+*/
+a,abbr,acronym,address,applet,article,aside,audio,b,big,blockquote,body,canvas,caption,center,cite,code,dd,del,details,dfn,div,dl,dt,em,embed,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,hgroup,html,i,iframe,img,ins,kbd,label,legend,li,mark,menu,nav,object,ol,output,p,pre,q,ruby,s,samp,section,small,span,strike,strong,sub,summary,sup,table,tbody,td,tfoot,th,thead,time,tr,tt,u,ul,var,video{margin:0;padding:0;border:0;font-size:100%;font:inherit;vertical-align:baseline}article,aside,details,figcaption,figure,footer,header,hgroup,menu,nav,section{display:block}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:after,blockquote:before,q:after,q:before{content:;content:none}table{border-collapse:collapse;border-spacing:0}
+
+
+/* style.css */
+};
+body, html {
+  height: 100%;
+}
+#content {
+  min-height: 100%;
+  height: auto !important;
+  height: 100%;
+  margin: 0 auto -168px;
+}
+.footerpush, footer {
+  height: 168px;
+}
+body {
+  color: #444;
+  font-size: 18px;
+  line-height: 28px;
+  font-family: Lucida Grande, Arial, sans-serif;
+  background-color: #FAF4ED;
+  min-width: 665px;
+  text-rendering: optimizeLegibility;
+}
+#title {
+  text-align: center;
+  font-weight: bold;
+  color: #000;
+  height: 224px;
+}
+#title h1 {
+  padding: 36px 0;
+  font-size: 45px;
+  line-height: 45px;
+}
+#title .not-insane {
+  font-size: 30px;
+  color: #808080;
+}
+#title a:active, #title a:link, #title a:visited {
+  color: #000000;
+  text-decoration: none;
+}
+article > *, header {
+  min-width: 625px;
+  max-width: 625px;
+  margin-left: auto;
+  margin-right: auto;
+}
+:link {
+  color: #00E;
+  text-decoration: none;
+}
+:visited {
+  color: #551A8B;
+}
+a:hover {
+  text-decoration: underline;
+}
+article {
+  margin-bottom: 56px;
+}
+article h1, article h2, article h3, article h4 {
+  color: #222;
+  margin-bottom: 28px;
+}
+article dd, article dl, article img, article ol, article p,
+article pre, article ul {
+  margin-bottom: 28px;
+}
+article div.h1wrapper {
+  width: 100%;
+  max-width: 865px;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: #BBB;
+  -webkit-border-radius: 2px;
+  -moz-border-radius: 2px;
+  border-radius: 2px;
+}
+article div.h1wrapper h1 {
+  min-width: 625px;
+  max-width: 625px;
+  margin-left: auto;
+  margin-right: auto;
+}
+article h1 {
+  padding: 14px 0;
+  font-size: 43px;
+  line-height: 84px;
+}
+article h2 {
+  font-size: 36px;
+  line-height: 56px;
+}
+article h3 {
+  font-size: 27px;
+  line-height: 56px;
+}
+article .subtitle > h2 {
+  font-size: 27px;
+  line-height: 56px;
+  text-align: right;
+}
+article ul {
+  list-style: outside disc;
+}
+article ul > li {
+  margin-left: 1.7em;
+}
+article li > p:only-child {
+  margin-bottom: 0;
+}
+article ol {
+  list-style: outside decimal;
+}
+article ol > li {
+  margin-left: 2.5em;
+}
+article ol > li > ol {
+  list-style-type: lower-alpha;
+}
+article ol > li > ol, article ol > li > ul, article ul > li > ol,
+article ul > li > ul {
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+article code, article pre {
+  background-color: #DDD;
+  font-family: monospace;
+  line-height: 26px;
+}
+article pre, article pre > code {
+  font-size: 16px;
+  line-height: 28px;
+  font-family: monospace;
+  -webkit-text-size-adjust: 90%;
+}
+article pre {
+  padding-left: 8px;
+  max-width: 617px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+article table.codehilitetable pre {
+  margin-bottom: 0px;
+}
+article table.codehilitetable td, article table.codehilitetable th {
+  padding-left: 0px;
+  padding-right: 0px;
+  border: 0px;
+}
+article hr {
+  height: 1px;
+  border-width: 0px;
+  color: #888;
+  background-color: #888;
+  margin-bottom: 27px;
+  width: 100%;
+  max-width: 865px;
+  margin-left: auto;
+  margin-right: auto;
+}
+article p:lang(en) {
+  -moz-hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+}
+article h1, article h2, article h3, article h4 {
+  font-weight: bolder;
+}
+article h5 {
+  font-variant: small-caps;
+}
+article .svgimage > * {
+  margin-left: auto;
+  margin-right: auto;
+}
+article .image > img {
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0;
+}
+article .image > div {
+  text-align: center;
+  font-size: 14px;
+}
+article abbr {
+  font-weight: bolder;
+}
+article dl dt {
+  font-weight: bolder;
+}
+article dl dd {
+  margin-left: 2.5em;
+}
+article sup {
+  font-size: 12px;
+  margin-left: 2px;
+  line-height: 1px;
+  vertical-align: super;
+}
+article div.footnote {
+  width: 100%;
+  max-width: 865px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 15px;
+}
+article div.footnote > * {
+  min-width: 625px;
+  max-width: 625px;
+  margin-left: auto;
+  margin-right: auto;
+}
+article div.footnote hr {
+  height: 1px;
+  border-width: 0px;
+  color: #888;
+  background-color: #888;
+  margin-bottom: 27px;
+  width: 100%;
+  max-width: 865px;
+  margin-left: auto;
+  margin-right: auto;
+}
+article div.toc {
+  margin-bottom: 28px;
+}
+article div.toc .toctitle {
+  font-size: 36px;
+  line-height: 56px;
+  font-weight: bolder;
+  margin-bottom: 28px;
+  display: block;
+}
+article blockquote {
+  border-left: 20px solid #222;
+  padding-left: 30px;
+  font-weight: bold;
+}
+article table {
+  border-collapse: collapse;
+  border-style: hidden;
+  max-width: 625px;
+  width: auto;
+  margin-bottom: 28px;
+}
+article table td, article table th {
+  border: 1px solid #000000;
+  empty-cells: show;
+}
+article table td, article table th {
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 16px;
+}
+article table td {
+  line-height: 27px;
+}
+article table th {
+  font-weight: bold;
+  line-height: 28px;
+}
+article div.date {
+  font-size: 16px;
+  padding-bottom: 28px;
+  color: #666;
+}
+article em {
+  font-style: italic;
+}
+article b, article strong {
+  font-weight: bolder;
+}
+article div.smallfont + div > pre {
+  font-size: 12px;
+}
+footer {
+  width: 100%;
+  max-width: 865px;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: #BBB;
+  -webkit-border-radius: 2px 2px 0 0;
+  -moz-border-radius: 2px 2px 0 0;
+  border-radius: 2px 2px 0 0;
+}
+footer > div {
+  min-width: 625px;
+  max-width: 625px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 28px;
+}
+footer > div :link, footer > div :visited {
+  margin-left: 2.5em;
+  color: #555;
+  font-size: 15px;
+  font-weight: bolder;
+}
+footer > div a > span {
+  text-decoration: underline;
+}
+footer > div #footer-left {
+  float: left;
+}
+footer > div #footer-right {
+  float: right;
+}
+img {
+  display: block;
+}
+@media print {
+  :link {
+    color: #00E;
+    text-decoration: underline;
+  }
+}
+@media print {
+  dl, ol, p, ul {
+    page-break-before: avoid;
+  }
+}
+@media print {
+  img, pre {
+    page-break-before: auto;
+  }
+}
+@media print {
+  h1, h2, h3, h4, hr {
+    page-break-before: auto;
+    page-break-after: avoid;
+  }
+}
+@media print {
+  body {
+    color: #000;
+  }
+}
+@media print {
+  footer {
+    display: none;
+  }
+}
+#alertbox {
+  display: none;
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  border-radius: 10px;
+  position: fixed;
+  top: 20%;
+  width: 30%;
+  left: 35%;
+  background-color: #FF3300;
+}
+#alertbox div {
+  margin: 10px;
+}
+.hll {
+  background-color: #ffffcc;
+}
+.c {
+  color: #408080;
+  font-style: italic;
+}
+.err {
+  border: 1px solid #FF0000;
+}
+.k {
+  color: #008000;
+  font-weight: bold;
+}
+.o {
+  color: #666666;
+}
+.cm {
+  color: #408080;
+  font-style: italic;
+}
+.cp {
+  color: #BC7A00;
+}
+.c1 {
+  color: #408080;
+  font-style: italic;
+}
+.cs {
+  color: #408080;
+  font-style: italic;
+}
+.gd {
+  color: #A00000;
+}
+.ge {
+  font-style: italic;
+}
+.gr {
+  color: #FF0000;
+}
+.gh {
+  color: #000080;
+  font-weight: bold;
+}
+.gi {
+  color: #00A000;
+}
+.go {
+  color: #808080;
+}
+.gp {
+  color: #000080;
+  font-weight: bold;
+}
+.gs {
+  font-weight: bold;
+}
+.gu {
+  color: #800080;
+  font-weight: bold;
+}
+.gt {
+  color: #0040D0;
+}
+.kc {
+  color: #008000;
+  font-weight: bold;
+}
+.kd {
+  color: #008000;
+  font-weight: bold;
+}
+.kn {
+  color: #008000;
+  font-weight: bold;
+}
+.kp {
+  color: #008000;
+}
+.kr {
+  color: #008000;
+  font-weight: bold;
+}
+.kt {
+  color: #B00040;
+}
+.m {
+  color: #666666;
+}
+.s {
+  color: #BA2121;
+}
+.na {
+  color: #7D9029;
+}
+.nb {
+  color: #008000;
+}
+.nc {
+  color: #0000FF;
+  font-weight: bold;
+}
+.no {
+  color: #880000;
+}
+.nd {
+  color: #AA22FF;
+}
+.ni {
+  color: #999999;
+  font-weight: bold;
+}
+.ne {
+  color: #D2413A;
+  font-weight: bold;
+}
+.nf {
+  color: #0000FF;
+}
+.nl {
+  color: #A0A000;
+}
+.nn {
+  color: #0000FF;
+  font-weight: bold;
+}
+.nt {
+  color: #008000;
+  font-weight: bold;
+}
+.nv {
+  color: #19177C;
+}
+.ow {
+  color: #AA22FF;
+  font-weight: bold;
+}
+.w {
+  color: #bbbbbb;
+}
+.mf {
+  color: #666666;
+}
+.mh {
+  color: #666666;
+}
+.mi {
+  color: #666666;
+}
+.mo {
+  color: #666666;
+}
+.sb {
+  color: #BA2121;
+}
+.sc {
+  color: #BA2121;
+}
+.sd {
+  color: #BA2121;
+  font-style: italic;
+}
+.s2 {
+  color: #BA2121;
+}
+.se {
+  color: #BB6622;
+  font-weight: bold;
+}
+.sh {
+  color: #BA2121;
+}
+.si {
+  color: #BB6688;
+  font-weight: bold;
+}
+.sx {
+  color: #008000;
+}
+.sr {
+  color: #BB6688;
+}
+.s1 {
+  color: #BA2121;
+}
+.ss {
+  color: #19177C;
+}
+.bp {
+  color: #008000;
+}
+.vc {
+  color: #19177C;
+}
+.vg {
+  color: #19177C;
+}
+.vi {
+  color: #19177C;
+}
+.il {
+  color: #666666;
+}
+
+
+
+  </style>
+</head><body>
+
+
+<div id="content">
+<header id="title">
+  <h1><a href="/">
+      Marek's
+      <div class="not-insane">totally not insane</div>
+      idea of the day
+  </a></h1>
+</header>
+
+
+
+
+<article>
+<div class="h1wrapper">
+<h1 id="dissecting-ssl-handshake" ok>Dissecting SSL handshake</h1>
+</div>
+<div class="date">16 June 2012</div>
+
+<p>Not everyone knows that the SSL handshake is not encrypted. When you
+think about it - there isn't other way, before the keys are exchanged
+the communication must be unencrypted. But I doubt many people think
+about it.</p>
+<p>Not only the SSL handshake is plain-text, but also it contains rather
+interesting data. I decided to find out how much information can be
+retrieved from it.</p>
+<h2 id="tls">TLS</h2>
+<p>Here's how the <a href="http://tools.ietf.org/html/rfc2246#page-31">TLS handshake works</a>:</p>
+<div class="codehilite"><pre>      Client                                 Server
+        <span class="o">|</span>                                      <span class="o">|</span>
+        <span class="o">|</span>  <span class="o">-----------</span> ClientHello <span class="o">---------&gt;</span>  <span class="o">|</span>
+        <span class="o">|</span>                                      <span class="o">|</span>
+        <span class="o">|</span>  <span class="o">&lt;----------</span> ServerHello <span class="o">----------</span>  <span class="o">|</span>
+        <span class="o">|</span>  <span class="o">&lt;----------</span> Certificate <span class="o">----------</span>  <span class="o">|</span>
+        <span class="o">|</span>                 <span class="kc">...</span>                  <span class="o">|</span>
+        <span class="o">|</span>  <span class="o">&lt;--------</span> ServerHelloDone <span class="o">--------</span>  <span class="o">|</span>
+        <span class="o">|</span>                 <span class="kc">...</span>                  <span class="o">|</span>
+</pre></div>
+
+
+<p>Let's focus on the first message - <code>ClientHello</code>. It is actually
+pretty interesting. RFC <a href="http://tools.ietf.org/html/rfc5246#page-41">defines the structure as</a>:</p>
+<div class="codehilite"><pre><span class="k">struct</span> <span class="p">{</span>
+    <span class="n">ProtocolVersion</span> <span class="n">client_version</span><span class="p">;</span>
+    <span class="n">Random</span> <span class="n">random</span><span class="p">;</span>
+    <span class="n">SessionID</span> <span class="n">session_id</span><span class="p">;</span>
+    <span class="n">CipherSuite</span> <span class="n">cipher_suites</span><span class="o">&lt;</span><span class="mf">2..2</span><span class="o">^</span><span class="mi">16</span><span class="o">-</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+    <span class="n">CompressionMethod</span> <span class="n">compression_methods</span><span class="o">&lt;</span><span class="mf">1..2</span><span class="o">^</span><span class="mi">8</span><span class="o">-</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+    <span class="n">Extension</span> <span class="n">extensions</span><span class="o">&lt;</span><span class="mf">0..2</span><span class="o">^</span><span class="mi">16</span><span class="o">-</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="p">}</span> <span class="n">ClientHello</span><span class="p">;</span>
+</pre></div>
+
+
+<p>Translated to English:</p>
+<dl>
+<dt>client_version</dt>
+<dd>The SSL/TLS protocol version the client (like the browser) wishes to
+  use during the session. Additionally there is a second version
+  number field on the framing layer, called
+  <a href="http://tools.ietf.org/html/rfc5246#page-19">Record layer</a>. And like
+  all SSL data, ClientHello message is wrapped in the Record
+  frame. The
+  <a href="http://tools.ietf.org/html/rfc5246#page-88">spec suggests</a> the
+  Record layer version field may be use to indicate the lowest
+  supported SSL/TLS version, but this is rarely used in practice. Only
+  <a href="https://github.com/majek/p0f/blob/6b1570c6caf8e6c4de0d67e72eb6892030223b01/p0f.fp#L1086-1089">older versions of Opera</a>
+  are using different values in Record and ClientHello layers.</dd>
+<dt>random</dt>
+<dd>
+<p>This value is formed of 4 bytes representing time since epoch on client
+host and 28 random bytes. Exposing timer sources may allow <a href="http://www.cl.cam.ac.uk/~sjm217/papers/usenix08clockskew.pdf">clock skew
+measurements</a>
+and those in theory may be used to identify hosts.</p>
+<div class="blockquotewrapper">
+<blockquote ok>
+<p>Your browser sends current time on the SSL layer.</p>
+</blockquote>
+</div>
+<p>Similarly, ServerHello sent by the server frame contains
+timestamp from the server.</p>
+</dd>
+<dt>session_id</dt>
+<dd>
+<p>Instead of going through full SSL handshake, the client may decide
+  to reuse previously established session. The session cache is usually
+  <a href="http://trac.webkit.org/wiki/Fingerprinting#SessionIDs">shared between normal and privacy modes</a>
+  of the browser.</p>
+<div class="blockquotewrapper">
+<blockquote ok>
+<p>Even in privacy mode, your browser may still be identifiable due
+to SSL session reuse.</p>
+</blockquote>
+</div>
+</dd>
+<dt>cipher_suites</dt>
+<dd>
+<p>The client shares the list of supported SSL ciphers with the server.
+  The server will later pick up the best cipher it knows. Some of the
+  ciphers are proven to be insecure and should be deprecated, some
+  others are
+  <a href="https://en.wikipedia.org/wiki/Elliptic_curve_cryptography">fairly recent</a>.
+  There isn't a global coherent list of good ciphers, and as a result
+  every client can support different set of ciphers. Additionally the
+  <a href="http://tools.ietf.org/html/rfc5246#page-40">ordering of the ciphers is significant</a>
+  and therefore even if clients agreed on ciphers the ordering might
+  be completely different.</p>
+<div class="blockquotewrapper">
+<blockquote ok>
+<p>By looking at the supported ciphers list it is often possible to
+tell what exact application had started the connection.</p>
+</blockquote>
+</div>
+</dd>
+<dt>compression_methods</dt>
+<dd>
+<p>Some clients (for example Chrome) support
+  <a href="http://tools.ietf.org/html/rfc3749#section-2.1">Deflate compression</a>.
+  on SSL layer. This usually makes sense - compressing HTTP headers
+  does save bandwidth.</p>
+</dd>
+<dt>extensions</dt>
+<dd>
+<p>TLS introduces
+<a href="http://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xml">a number of extensions</a>.
+Most notably the <code>server_name</code> /
+<a href="http://tools.ietf.org/html/rfc4366#section-3.1">Server Name Indication</a>
+<a href="https://en.wikipedia.org/wiki/Server_Name_Indication">(SNI)</a>
+extension is used to specify a remote host name. This allows the
+server to choose appropriate certificate based on the requested
+host name.  With this extension one can host many SSL-enabled
+vhosts on a single IP address. Famously
+<a href="http://adam.heroku.com/past/2009/9/22/sni_ssl/">SNI doesn't work on any IE on Windows XP</a>.</p>
+<div class="blockquotewrapper">
+<blockquote ok>
+<p>When using SSL, the remote domain name is transferred over the
+wire in plain text. Anyone able to sniff the traffic can know
+exactly what domains you're looking at, even when you're using
+HTTPS.</p>
+</blockquote>
+</div>
+<p>Similarly to the cipher list extensions and their order are
+application specific. For example:
+<a href="http://www.torproject.us/projects/torbrowser.html.en">FireFox 11 bundled with TOR</a>
+is distinguishable from standalone installation - it doesn't send
+<code>SessionTicket TLS</code> extension. Another example - Windows XP
+doesn't send <code>Renegotiation Info</code> extension without
+<a href="http://technet.microsoft.com/en-us/security/bulletin/MS10-049">patch MS10-049</a>
+applied.</p>
+</dd>
+</dl>
+<p>That's it, now you know what's hiding in the SSL ClientHello message. For
+completeness, a few words on historical protocols.</p>
+<h2 id="ssl-30">SSL 3.0</h2>
+<p><a href="https://tools.ietf.org/html/rfc6101">SSLv3</a> is identical to
+TLS as described, with one exception - in theory SSLv3 ClientHello packet doesn't
+have
+<a href="https://tools.ietf.org/html/rfc6101#page-26">an extensions field</a>.
+In theory SSLv3 doesn't do
+<a href="https://en.wikipedia.org/wiki/Server_Name_Indication">SNI</a>.</p>
+<p>In practice this is more complicated. TLS 1.0 also
+<a href="http://tools.ietf.org/html/rfc2246#page-35">doesn't specify extensions field</a>,
+but most clients do send them anyway.</p>
+<h2 id="ssl-20">SSL 2.0</h2>
+<p><a href="http://www.mozilla.org/projects/security/pki/nss/ssl/draft02.html">SSL 2.0</a>
+was
+<a href="https://en.wikipedia.org/wiki/Transport_Layer_Security#SSL_1.0.2C_2.0_and_3.0">originally developed by Netscape</a>. It's
+old, barely documented and insecure. However few applications still
+support it for compatibility with old servers. Some versions of <code>wget</code>
+and google crawler use the SSLv2 handshake. A <code>CLIENT-HELLO</code> message is
+defined as:</p>
+<div class="codehilite"><pre><span class="kt">char</span> <span class="n">MSG</span><span class="o">-</span><span class="n">CLIENT</span><span class="o">-</span><span class="n">HELLO</span>
+<span class="kt">char</span> <span class="n">CLIENT</span><span class="o">-</span><span class="n">VERSION</span><span class="o">-</span><span class="n">MSB</span>
+<span class="kt">char</span> <span class="n">CLIENT</span><span class="o">-</span><span class="n">VERSION</span><span class="o">-</span><span class="n">LSB</span>
+<span class="kt">char</span> <span class="n">CIPHER</span><span class="o">-</span><span class="n">SPECS</span><span class="o">-</span><span class="n">LENGTH</span><span class="o">-</span><span class="n">MSB</span>
+<span class="kt">char</span> <span class="n">CIPHER</span><span class="o">-</span><span class="n">SPECS</span><span class="o">-</span><span class="n">LENGTH</span><span class="o">-</span><span class="n">LSB</span>
+<span class="kt">char</span> <span class="n">SESSION</span><span class="o">-</span><span class="n">ID</span><span class="o">-</span><span class="n">LENGTH</span><span class="o">-</span><span class="n">MSB</span>
+<span class="kt">char</span> <span class="n">SESSION</span><span class="o">-</span><span class="n">ID</span><span class="o">-</span><span class="n">LENGTH</span><span class="o">-</span><span class="n">LSB</span>
+<span class="kt">char</span> <span class="n">CHALLENGE</span><span class="o">-</span><span class="n">LENGTH</span><span class="o">-</span><span class="n">MSB</span>
+<span class="kt">char</span> <span class="n">CHALLENGE</span><span class="o">-</span><span class="n">LENGTH</span><span class="o">-</span><span class="n">LSB</span>
+<span class="kt">char</span> <span class="n">CIPHER</span><span class="o">-</span><span class="n">SPECS</span><span class="o">-</span><span class="n">DATA</span><span class="p">[(</span><span class="n">MSB</span><span class="o">&lt;&lt;</span><span class="mi">8</span><span class="p">)</span><span class="o">|</span><span class="n">LSB</span><span class="p">]</span>
+<span class="kt">char</span> <span class="n">SESSION</span><span class="o">-</span><span class="n">ID</span><span class="o">-</span><span class="n">DATA</span><span class="p">[(</span><span class="n">MSB</span><span class="o">&lt;&lt;</span><span class="mi">8</span><span class="p">)</span><span class="o">|</span><span class="n">LSB</span><span class="p">]</span>
+<span class="kt">char</span> <span class="n">CHALLENGE</span><span class="o">-</span><span class="n">DATA</span><span class="p">[(</span><span class="n">MSB</span><span class="o">&lt;&lt;</span><span class="mi">8</span><span class="p">)</span><span class="o">|</span><span class="n">LSB</span><span class="p">]</span>
+</pre></div>
+
+
+<p>The fields are familiar - <code>client_version</code>, <code>cipher_suites</code>,
+<code>session_id</code> and <code>challenge</code>. It's worth noting that SSLv2 doesn't
+have extensions - there is no way to specify
+<a href="https://en.wikipedia.org/wiki/Server_Name_Indication">SNI</a> .</p>
+<p>On a final note, <code>challenge-data</code> length must be between 16 and 32
+bytes long. In real world I've only seen 16 and 32.</p>
+<h2 id="summary">Summary</h2>
+<p>Things to remember:</p>
+<ul>
+<li>
+<p>Anyone snooping the HTTPS traffic is able to see the remote domain
+   name in plain text due to SNI.</p>
+</li>
+<li>
+<p><code>ClientHello</code> message contains a lot of stuff and it is often
+   possible to identify a client application just by looking at it.</p>
+</li>
+<li>
+<p>During SSL handshake both the client and the server send their
+   local time in plain-text.</p>
+</li>
+<li>
+<p>Never enable SSLv2.</p>
+</li>
+</ul>
+<p>Continue reading about <a href="/2012-06-17-ssl-fingerprinting-for-p0f/">SSL fingerprinting &#8594;</a><br>
+Comment on <a href="http://news.ycombinator.com/item?id=4126040">YCombinator &#8594;</a></p> </article>
+
+
+<div class="footerpush"></div>
+</div> <!-- content -->
+
+<footer>
+  <div>
+    <span id="footer-left">
+      <a href="https://twitter.com/majek04">
+        Catch me on <span>Twitter</span>
+      </a>
+    </span>
+    
+    <span id="footer-right">
+      <a href="/">More Articles &#8594;</a>
+    </span>
+    
+  </div>
+</footer>
+
+
+<div id="alertbox"><div id="alert">a</div></div>
+
+<script>
+var show_alert = function(msg){
+    document.getElementById('alertbox').style.display="block";
+    document.getElementById('alert').innerHTML = msg;
+
+};
+
+if (document.location.href.indexOf('idea.popcount.org') === -1) {
+    var counter = 0;
+
+    var ws_url = function(){
+        return ((document.location.protocol === 'http:') ? 'ws://' : 'wss://') +
+            document.location.host + '/ws';
+    }
+
+    var try_reconnect = function(){
+        counter += 1;
+        show_alert('Reconnecting... (' + counter + ')');
+        console.log('[*] reconnecting...');
+        setTimeout(function(){
+            ws = new WebSocket(ws_url());
+            ws.onclose = try_reconnect;
+            ws.onopen = function(){
+                ws.onclose = null;
+                document.location.reload();
+            };
+        }, 150);
+    };
+
+    if ('WebSocket' in window && 'console' in window){
+        var ws = new WebSocket(ws_url());
+        ws.onopen = function(){
+            console.log('[*] ws hooked! ' + Date());
+            ws.onclose = try_reconnect;
+        };
+    }
+}
+
+// Escape frames for browsers without X-Frame-Options
+if (top != window) {
+    top.location.href = location.href;
+}
+
+
+var _debug = 0;
+var flip_debug = function(){
+    var leading = 28;
+    var bg = ""
+    if (!_debug) {
+            bg = "url('/" + leading + "px_grid_bg.gif') 0 0";
+    }
+    _debug = !_debug;
+    document.body.style.background = bg;
+}
+
+if ('captureEvents' in window) {
+    window.captureEvents(Event.KEYPRESS);
+    window.onkeypress = function(e) {
+        if (e.which === 100) { // key "d"
+            flip_debug();
+        }
+    };
+};
+
+
+var _gaq = [];
+if (document.location.href.indexOf('idea.popcount.org') !== -1) {
+
+    // I surrender my soul to Google. Feel encouraged to use noscript.
+    _gaq = [['_setAccount', 'UA-283061-10'], ['_trackPageview']];
+
+    (function() {
+        var ga = document.createElement('script');
+        ga.type = 'text/javascript';
+        ga.async = true;
+        ga.src = 'https://ssl.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0];
+        s.parentNode.insertBefore(ga, s);
+    })();
+
+    window.onerror = function(m, f, l){
+        var err = [f, l, m].join(' : ');
+        _gaq.push(['_trackEvent', 'Errors', 'App', err, null, true]);
+    }
+
+}
+
+
+</script>
+
+</body></html>
